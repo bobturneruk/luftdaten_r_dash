@@ -1,0 +1,53 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(httr)
+library(lubridate)
+library(magrittr)
+```
+
+2019-06-25_sds011_sensor_26953.csv
+
+```{r}
+
+http_error("https://archive.luftdaten.info/2019-06-25/2019-06-25_sds011_sensor_26953.csv")
+
+```
+
+```{r}
+sensor_url<-function(required_date,sensor_id){
+  paste0("https://archive.luftdaten.info/",
+         required_date,
+         "/",
+         required_date,
+         "_sds011_sensor_",
+         sensor_id,
+         ".csv")
+}
+```
+
+```{r}
+sensor_url("2019-06-25",26953) %>%
+  http_error()
+```
+
+
+```{r}
+
+sensor_of_choice<-26953
+
+files<-tibble(day=seq(ymd('2019-06-26'),today(),by='days'))
+
+files %<>%
+  mutate(url=sensor_url(day,sensor_of_choice))
+
+files %<>%
+  mutate(http_error(url))
+
+
+```
+
