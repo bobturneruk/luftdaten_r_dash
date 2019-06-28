@@ -80,8 +80,8 @@ names(sensor_data)
 # Time series
 
 ```{r}
-sensor_data_summary %>%
-  ggplot(aes(x=date_aggregate,y=mean_P1))+
+sensor_data %>%
+  ggplot(aes(x=timestamp,y=P1))+
     geom_point()+
     geom_smooth()
 ```
