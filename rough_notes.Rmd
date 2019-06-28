@@ -8,14 +8,8 @@ library(tidyverse)
 library(httr)
 library(lubridate)
 library(magrittr)
-```
-
-2019-06-25_sds011_sensor_26953.csv
-
-```{r}
-
-http_error("https://archive.luftdaten.info/2019-06-25/2019-06-25_sds011_sensor_26953.csv")
-
+library(broom)
+library(fuzzyjoin)
 ```
 
 ```{r}
@@ -30,24 +24,92 @@ sensor_url<-function(required_date,sensor_id){
 }
 ```
 
-```{r}
-sensor_url("2019-06-25",26953) %>%
-  http_error()
-```
+```{r message=FALSE}
 
+start_day=ymd("2019-05-25")
+stop_day=ymd("2019-06-03")
+sensor_of_choice<-22951
 
-```{r}
-
-sensor_of_choice<-26953
-
-files<-tibble(day=seq(ymd('2019-06-26'),today(),by='days'))
+files<-tibble(day=seq(start_day,stop_day,by='days'))
 
 files %<>%
   mutate(url=sensor_url(day,sensor_of_choice))
 
 files %<>%
-  mutate(http_error(url))
+  group_by(day,url) %>%
+  do(exists=!http_error(.$url))
 
+sensor_data<-files %>%
+  filter(exists==TRUE) %>%
+  select(url) %>%
+  as_vector() %>%
+  map(~read_delim(file=.x,delim=";")) %>%
+  bind_rows()
 
 ```
+
+```{r}
+
+rolling_mean<-sensor_data %>%
+  difference_left_join(sensor_data,by="timestamp",max_dist=hours(12)) %>%
+  group_by(timestamp.x) %>%
+  summarise(P1=mean(P1.x),P2=mean(P2.x),roll_P1=mean(P1.y),roll_P2=mean(P2.y),count=n())
+
+```
+
+```{r}
+rolling_mean %>%
+  ggplot(aes(x=timestamp.x,y=P1))+
+    geom_point(size=.1)+
+    geom_line(aes(y=roll_P1),colour="blue",size=1,alpha=.5)
+```
+
+
+```{r}
+sensor_data_summary <- sensor_data %>%
+  mutate(date_aggregate=floor_date(timestamp,"day")) %>%
+  group_by(date_aggregate) %>%
+  summarise(mean_P1=mean(P1),mean_P2=mean(P2))
+```
+
+
+```{r}
+names(sensor_data)
+```
+
+# Time series
+
+```{r}
+sensor_data_summary %>%
+  ggplot(aes(x=date_aggregate,y=mean_P1))+
+    geom_point()+
+    geom_smooth()
+```
+
+# Correlation
+
+```{r}
+sensor_data %>%
+  ggplot(aes_string(x=names(sensor_data)[7],y=names(sensor_data)[10],colour=names(sensor_data)[6]))+
+    geom_point(alpha=0.1)
+```
+
+# Cross correlation
+
+```{r}
+ccf(sensor_data$P1,sensor_data$P1,plot=FALSE) %>% 
+  tidy() %>%
+  ggplot(aes(x=lag,y=acf)) +
+    geom_point()
+```
+
+# Day of Week
+
+```{r}
+sensor_data %>%
+  mutate(day_of_week=wday(timestamp,label=TRUE)) %>%
+  ggplot(aes(day_of_week,P1))+
+    geom_bar(stat="summary",fun.y="mean")
+```
+
 
