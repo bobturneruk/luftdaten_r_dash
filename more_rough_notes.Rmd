@@ -1,0 +1,73 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(maps)
+library(mapproj)
+library(rvest)
+library(tidyverse)
+```
+
+```{r}
+base_path<-"http://archive.luftdaten.info/2019-05-22/"
+luftdaten_data<-read_html(base_path)
+```
+
+```{r}
+sensor_list<-luftdaten_data %>%
+  html_nodes("a") %>%
+  html_attr("href") %>%
+  as_tibble()
+```
+
+
+```{r}
+luftdaten_table<-html_table(luftdaten_data)
+luftdaten_table<-luftdaten_table[[1]]
+```
+
+```{r}
+luftdaten_files<-paste0(base_path,luftdaten_table$Name[-c(1,2)])[1:1000]
+```
+
+```{r}
+luftdaten_sensor_data<-luftdaten_files %>%
+  map(function(x) read_delim(x,";")) %>% 
+  reduce(rbind)
+```
+
+```{r}
+luftdaten_sensor_data %>%
+  filter(temperature>-20) %>%
+  mutate(sensor_id=as.factor(sensor_id)) %>%
+  ggplot(aes(x=timestamp,y=temperature,colour=sensor_id,group=sensor_id))+
+    geom_line()
+```
+
+```{r}
+luftdaten_locations<-luftdaten_sensor_data %>%
+  distinct(lat,lon)
+
+luftdaten_locations %>%
+  ggplot(aes(x = lon, y = lat)) + 
+  geom_bin2d() +
+  coord_map()
+```
+
+
+
+```{r}
+library(ggmap)
+#mymap <- map_data(map = "world") # changed map to "world"
+map <- get_map(location = 'Europe', zoom = 4, source="osm")
+ggplot(data = map, aes(x = long, y = lat, group=group)) + 
+  geom_polygon() +
+  coord_map()
+
+
+ # geom_bin2d(data=luftdaten_locations, aes(x = lon, y = lat))
+```
+
