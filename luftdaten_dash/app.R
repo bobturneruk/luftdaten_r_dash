@@ -31,16 +31,21 @@ ui <- fillPage(
     # Application title
     titlePanel("Luftdaten Sensor Longdituinal Data"),
 
-    #some cursory instructions
-    p("Find sensor IDs by clicking on hexes on",
-      a("Luftdaten Map",href="https://deutschland.maps.luftdaten.info"),
-      ". You'll have to copy/paste."),
-    p("If you specify a large date range, it may take a while to pull the data!"),
-    p("The choice of deault sensor ID is arbitrary."),
+    
     
     # Sidebar 
     sidebarLayout(
         sidebarPanel(
+            #some cursory instructions
+            p("Find sensor IDs by clicking on hexes on",
+              a("Luftdaten Map",href="https://deutschland.maps.luftdaten.info"),
+              ". You'll have to copy/paste."),
+            p("If you specify a large date range, it may take a while to pull the data!"),
+            p("The choice of deault sensor ID is arbitrary."),
+            p("Contains information from archive.luftdaten.info, which is made available here under the",
+              a("Open Database License (ODbL)",href="https://opendatacommons.org/licenses/odbl/1.0/"),
+            "."),
+          
             #sensor ID
             numericInput("sensor", label = "Sensor ID:", value=22951, min=0, step=1),
             #required date range
@@ -49,7 +54,7 @@ ui <- fillPage(
 
         # Show a plot of particle density by time
         mainPanel(
-           plotOutput("timePlot",height="800")
+           plotOutput("timePlot",height="600")
         )
     )
 )
