@@ -1,0 +1,12 @@
+name: Dash_Experiement
+title: Dash_Experiement
+username:
+account: bobturner
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1006550
+bundleId: 2191290
+url: https://bobturner.shinyapps.io/Dash_Experiement/
+when: 1561991797.24154
+asMultiple: FALSE
+asStatic: FALSE
