@@ -5,69 +5,108 @@ output: html_notebook
 
 ```{r}
 library(ggplot2)
-library(maps)
-library(mapproj)
 library(rvest)
 library(tidyverse)
 ```
 
+
+
 ```{r}
-base_path<-"http://archive.luftdaten.info/2019-05-22/"
-luftdaten_data<-read_html(base_path)
+make_sensor_list<-function(day){
+  folder_url<-paste0("http://archive.luftdaten.info/",day,"/")
+  tibble(sensor_file=read_html(folder_url) %>%
+    html_nodes("a") %>%
+    html_attr("href")) %>%
+    filter(sensor_file %>% str_detect(".csv")) %>%
+    mutate(file_url=paste0(folder_url,sensor_file)) %>%
+    separate(sensor_file,into=c("date","sensor_type",NA,"sensor_id","indoor"),sep="_",remove=FALSE) %>%
+    mutate(sensor_id=str_remove_all(sensor_id,".csv"),
+           indoor=str_replace_all(indoor,"indoor.csv","TRUE"),
+           indoor=replace_na(indoor,"FALSE")) %>%
+  return()
+}
+
+
 ```
 
 ```{r}
-sensor_list<-luftdaten_data %>%
-  html_nodes("a") %>%
-  html_attr("href") %>%
-  as_tibble()
+start_day=ymd("2019-01-01")
+stop_day=ymd("2019-06-30")
+
+sensor_list<-tibble(day=seq(start_day,stop_day,by='days')) %>%
+  group_by(day) %>%
+  do(make_sensor_list(.$day))
+
+```
+
+```{r}
+first_day_list<-sensor_list %>%
+  group_by(sensor_id) %>%
+  summarise(first_day=min(day)) %>%
+  left_join(sensor_list,by=c("sensor_id"="sensor_id","first_day"="day")) %>%
+  mutate(sensor_id=as.numeric(sensor_id))
+```
+
+
+```{r message=FALSE}
+if(!exists("sensor_details")){
+  sensor_details=data.frame(first_day=as_date(character()),sensor_id=as.numeric(character()))
+}
+
+missing_sensors<-first_day_list %>%
+  anti_join(sensor_details,by=c("first_day","sensor_id"))
+
+sensor_details %<>%  bind_rows(
+      missing_sensors[1:5000,] %>%
+      group_by(first_day,sensor_file,file_url) %>%
+      do(read_delim(.$file_url,";",n_max=1)))
+
+write_csv(sensor_details,"sensor_details.csv")
+
+```
+
+```{r}
+sensor_list_details<-sensor_list %>%
+  mutate(sensor_id=as.numeric(sensor_id)) %>%
+  inner_join(sensor_details %>% select(sensor_id,location,lat,lon)
+             ,by="sensor_id")
+  
+write_csv(sensor_list_details,"sensor_list_details.csv")
+```
+
+```{r}
+library(ggmap)
+library(maps)
+library(mapdata)
 ```
 
 
 ```{r}
-luftdaten_table<-html_table(luftdaten_data)
-luftdaten_table<-luftdaten_table[[1]]
+europe <- c(
+  "Portugal", "Spain", "France", "Switzerland", "Germany",
+  "Austria", "Belgium", "UK", "Netherlands",
+  "Denmark", "Poland", "Italy", 
+  "Croatia", "Slovenia", "Hungary", "Slovakia",
+  "Czech republic","Norway","Sweden","Finland","Greece"
+)
+my_map<-map_data("worldHires")
 ```
 
-```{r}
-luftdaten_files<-paste0(base_path,luftdaten_table$Name[-c(1,2)])[1:1000]
+```{r, fig.width=12}
+ggplot() +
+  geom_polygon(data = my_map, aes(x=long, y = lat, group = group))+
+  geom_count(data=sensor_details,aes(x = lon, y = lat),alpha=.3,colour="blue")+
+  #coord_map(xlim=c(-25,25),ylim=c(30,70))
+  scale_size_area()+
+  coord_map()
 ```
 
-```{r}
-luftdaten_sensor_data<-luftdaten_files %>%
-  map(function(x) read_delim(x,";")) %>% 
-  reduce(rbind)
-```
 
 ```{r}
-luftdaten_sensor_data %>%
-  filter(temperature>-20) %>%
-  mutate(sensor_id=as.factor(sensor_id)) %>%
-  ggplot(aes(x=timestamp,y=temperature,colour=sensor_id,group=sensor_id))+
-    geom_line()
-```
-
-```{r}
-luftdaten_locations<-luftdaten_sensor_data %>%
-  distinct(lat,lon)
-
-luftdaten_locations %>%
+sensor_list_details %>%
   ggplot(aes(x = lon, y = lat)) + 
   geom_bin2d() +
   coord_map()
 ```
 
-
-
-```{r}
-library(ggmap)
-#mymap <- map_data(map = "world") # changed map to "world"
-map <- get_map(location = 'Europe', zoom = 4, source="osm")
-ggplot(data = map, aes(x = long, y = lat, group=group)) + 
-  geom_polygon() +
-  coord_map()
-
-
- # geom_bin2d(data=luftdaten_locations, aes(x = lon, y = lat))
-```
 
