@@ -56,14 +56,14 @@ if(!exists("sensor_details")){
 missing_sensors<-first_day_list %>%
   anti_join(sensor_details,by=c("first_day","sensor_id"))
 
-sensor_details %<>%  bind_rows(
-      missing_sensors[1:5000,] %>%
-      group_by(first_day,sensor_file,file_url) %>%
-      do(read_delim(.$file_url,";",n_max=1)))
+sensor_details %<>%  bind_rows(missing_sensors %>%
+                      group_by(first_day,sensor_file) %>%
+                      group_map(~ read_delim(.x$file_url,";",n_max=1)))
 
 write_csv(sensor_details,"sensor_details.csv")
 
 ```
+
 
 ```{r}
 sensor_list_details<-sensor_list %>%
@@ -89,16 +89,17 @@ europe <- c(
   "Croatia", "Slovenia", "Hungary", "Slovakia",
   "Czech republic","Norway","Sweden","Finland","Greece"
 )
-my_map<-map_data("worldHires")
+my_map<-map_data("world")
 ```
 
 ```{r, fig.width=12}
 ggplot() +
-  geom_polygon(data = my_map, aes(x=long, y = lat, group = group))+
-  geom_count(data=sensor_details,aes(x = lon, y = lat),alpha=.3,colour="blue")+
+  geom_polygon(data = my_map, aes(x=long, y = lat, group = group), fill="white")+
+  geom_bin2d(data=sensor_details,aes(x = lon, y = lat),bins=c(200,100),alpha=.5)+
   #coord_map(xlim=c(-25,25),ylim=c(30,70))
-  scale_size_area()+
-  coord_map()
+  scale_size_area(max_size = 5)+
+  scale_fill_viridis_c()+
+  coord_quickmap()
 ```
 
 
