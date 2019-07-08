@@ -81,12 +81,15 @@ get_location<-function(file_url){
 
 
 ```{r message=FALSE}
-sensor_locations<-first_day_list[1:10000,] %>%
+sensor_locations<-first_day_list %>%
                     group_by(file_url) %>%
                     do(get_location(.$file_url))
 
 ```
 
+```{r}
+write_csv(sensor_locations,"sensor_locations.csv")
+```
 
 ```{r}
 sensor_list_details<-sensor_list %>%
