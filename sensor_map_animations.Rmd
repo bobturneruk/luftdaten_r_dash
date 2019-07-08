@@ -1,0 +1,62 @@
+---
+title: "Sensor Map Animations"
+output: html_notebook
+---
+
+```{r}
+library(ggmap)
+library(maps)
+library(mapdata)
+library(gganimate)
+library(tidyverse)
+```
+
+
+```{r}
+sensors<-read_csv("sensor_locations_active_days.csv")
+
+europe <- c(
+  "Portugal", "Spain", "France", "Switzerland", "Germany",
+  "Austria", "Belgium", "UK", "Netherlands",
+  "Denmark", "Poland", "Italy", 
+  "Croatia", "Slovenia", "Hungary", "Slovakia",
+  "Czech republic","Norway","Sweden","Finland","Greece"
+)
+my_map<-map_data("world")
+```
+
+```{r}
+sens_to_plot %>%
+  ggplot(aes(x=day))+
+  geom_bar()
+  
+```
+
+
+```{r, fig.width=12}
+sens_to_plot<-sensors %>%
+  filter(lon>-11,lon<2,lat>50,lat<61)
+
+animap<-
+ggplot()+
+  geom_polygon(data = my_map, aes(x=long, y = lat, group = group), fill="white")+
+  geom_bin2d(data=sens_to_plot,aes(x=lon,y=lat),bins=c(800,500))+
+  geom_point(data=sens_to_plot,aes(x=lon,y=lat), colour="white", size=0.1)+
+  scale_size_area(max_size = 5)+
+  scale_fill_viridis_c(limits=c(1,50))+
+  coord_quickmap(xlim=c(-11,2),ylim=c(50,61))+
+  #coord_quickmap()+
+  transition_states(day,transition_length=1,state_length=2,wrap=FALSE)+
+  labs(title="Luftdaten Sensors", 
+       subtitle='Date: {closest_state}',
+       caption="Open data (ODbL) from https://archive.luftdaten.info")
+```
+
+```{r}
+options(gganimate.dev_args = list(width = 400, height = 600))
+animate(animap,nframes=n_distinct(sens_to_plot$day)*2)
+```
+```{r}
+anim_save("animap.gif")
+```
+

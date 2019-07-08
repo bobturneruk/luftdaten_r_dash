@@ -4,7 +4,7 @@ output: html_notebook
 ---
 
 ```{r}
-library(ggplot2)
+library(lubridate)
 library(rvest)
 library(tidyverse)
 ```
@@ -49,26 +49,6 @@ first_day_list<-sensor_list %>%
   mutate(sensor_id=as.numeric(sensor_id))
 ```
 
-
-```{r message=FALSE}
-#if(!exists("sensor_details")){
-#  sensor_details=data.frame(first_day=as_date(character()),sensor_id=as.numeric(character()))
-#}
-
-#missing_sensors<-first_day_list %>%
-#  anti_join(sensor_details,by=c("first_day","sensor_id"))
-
-#unique(first_day_list$sensor_type) %>%
-#  purrr::walk(~dir.create(paste0("data/",.x)))
-
-#first_day_list[1:10,] %>%
-#    group_by(first_day,sensor_id) %>%
-#    group_walk(~ {read_delim(.x$file_url,";",n_max=1) %>% #write_delim(paste0("data/",.x$sensor_type,".csv"),delim=";",append=TRUE,col_names=TRUE)})
-
-#write_csv(sensor_details,"sensor_details.csv")
-```
-
-
 ```{r message=FALSE}
 get_location<-function(file_url){
   tryCatch(
@@ -85,50 +65,23 @@ sensor_locations<-first_day_list %>%
                     group_by(file_url) %>%
                     do(get_location(.$file_url))
 
+#write_csv(sensor_locations,"sensor_locations.csv")
 ```
 
 ```{r}
-write_csv(sensor_locations,"sensor_locations.csv")
+sensor_locations<-read_csv("sensor_locations.csv")
 ```
 
 ```{r}
-sensor_list_details<-sensor_list %>%
+sensor_locations_active_days<-sensor_list %>%
   mutate(sensor_id=as.numeric(sensor_id)) %>%
-  inner_join(sensor_details %>% select(sensor_id,location,lat,lon)
+  inner_join(sensor_locations %>% select(sensor_id,location,lat,lon)
              ,by="sensor_id")
   
-write_csv(sensor_list_details,"sensor_list_details.csv")
-```
-
-```{r}
-library(ggmap)
-library(maps)
-library(mapdata)
-library(gganimate)
+write_csv(sensor_locations_active_days,"sensor_locations_active_days.csv")
 ```
 
 
-```{r}
-europe <- c(
-  "Portugal", "Spain", "France", "Switzerland", "Germany",
-  "Austria", "Belgium", "UK", "Netherlands",
-  "Denmark", "Poland", "Italy", 
-  "Croatia", "Slovenia", "Hungary", "Slovakia",
-  "Czech republic","Norway","Sweden","Finland","Greece"
-)
-my_map<-map_data("world")
-```
-
-```{r, fig.width=12}
-ggplot() +
-  geom_polygon(data = my_map, aes(x=long, y = lat, group = group), fill="white")+
-  geom_bin2d(data=sensor_list_details,aes(x = lon, y = lat),bins=c(200,100),alpha=.5)+
-  #coord_map(xlim=c(-25,25),ylim=c(30,70))
-  scale_size_area(max_size = 5)+
-  scale_fill_viridis_c()+
-  coord_quickmap()+
-  transition_states(day,transition_length = 2,state_length = 1)
-```
 
 
 
