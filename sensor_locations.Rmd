@@ -84,7 +84,6 @@ get_location<-function(file_url){
 sensor_locations<-first_day_list[1:10000,] %>%
                     group_by(file_url) %>%
                     do(get_location(.$file_url))
-  
 
 ```
 
