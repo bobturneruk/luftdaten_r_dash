@@ -51,18 +51,40 @@ first_day_list<-sensor_list %>%
 
 
 ```{r message=FALSE}
-if(!exists("sensor_details")){
-  sensor_details=data.frame(first_day=as_date(character()),sensor_id=as.numeric(character()))
+#if(!exists("sensor_details")){
+#  sensor_details=data.frame(first_day=as_date(character()),sensor_id=as.numeric(character()))
+#}
+
+#missing_sensors<-first_day_list %>%
+#  anti_join(sensor_details,by=c("first_day","sensor_id"))
+
+#unique(first_day_list$sensor_type) %>%
+#  purrr::walk(~dir.create(paste0("data/",.x)))
+
+#first_day_list[1:10,] %>%
+#    group_by(first_day,sensor_id) %>%
+#    group_walk(~ {read_delim(.x$file_url,";",n_max=1) %>% #write_delim(paste0("data/",.x$sensor_type,".csv"),delim=";",append=TRUE,col_names=TRUE)})
+
+#write_csv(sensor_details,"sensor_details.csv")
+```
+
+
+```{r message=FALSE}
+get_location<-function(file_url){
+  tryCatch(
+    read_delim(file_url,";",n_max=1) %>% 
+      select(sensor_id,sensor_type,location,lat,lon),
+    error=function(c) data.frame(error=as.character(c),fail_url=file_url)
+  )
 }
+```
 
-missing_sensors<-first_day_list %>%
-  anti_join(sensor_details,by=c("first_day","sensor_id"))
 
-sensor_details %<>%  bind_rows(missing_sensors[1:5000,] %>%
-                      group_by(first_day,sensor_file) %>%
-                      do(read_delim(.$file_url,";",n_max=1)))
-
-write_csv(sensor_details,"sensor_details.csv")
+```{r message=FALSE}
+sensor_locations<-first_day_list[1:10000,] %>%
+                    group_by(file_url) %>%
+                    do(get_location(.$file_url))
+  
 
 ```
 
