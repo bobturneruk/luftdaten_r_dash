@@ -7,39 +7,98 @@ output: html_notebook
 library(lubridate)
 library(rvest)
 library(tidyverse)
+library(DescTools)
 ```
 
+This rests on the fundamental assumption that all of the sensor ids are unique and that if a sensor goes offline, it's id is not reused! And that sensors do not move around. To do carry out this excercise without these assumptions would require shifting a lot more data around.
 
 
 ```{r}
+# A function that takes a date formatted YYYY-MM-DD and returns a data frame 
+# containing a list of sensors that were active on that day from the luftdaten archive
+
+# The data frame has the following fields:
+# "sensor_file" 
+# "date"        
+# "sensor_type" 
+# "sensor_id"   
+# "indoor"     
+# "file_url"
+
 make_sensor_list<-function(day){
   folder_url<-paste0("http://archive.luftdaten.info/",day,"/")
-  tibble(sensor_file=read_html(folder_url) %>%
-    html_nodes("a") %>%
-    html_attr("href")) %>%
-    filter(sensor_file %>% str_detect(".csv")) %>%
-    mutate(file_url=paste0(folder_url,sensor_file)) %>%
-    separate(sensor_file,into=c("date","sensor_type",NA,"sensor_id","indoor"),sep="_",remove=FALSE) %>%
+  start_time<-Sys.time()
+  tryCatch(
+    read_html(folder_url) %>%
+    html_node(xpath="/html/body/table") %>%
+    html_table() %>%
+    select(name="Name",last_modified="Last modified",size="Size") %>%
+    filter(name %>% str_detect(".csv")) %>%
+    mutate(size=str_replace_all(size,"K","000") %>% as.numeric()) %>%
+    separate(name,into=c("date","sensor_type",NA,"sensor_id","indoor"),sep="_",remove=TRUE) %>%
     mutate(sensor_id=str_remove_all(sensor_id,".csv"),
-           indoor=str_replace_all(indoor,"indoor.csv","TRUE"),
-           indoor=replace_na(indoor,"FALSE")) %>%
-  return()
+             indoor=str_replace_all(indoor,"indoor.csv","TRUE"),
+             indoor=replace_na(indoor,"FALSE")),
+    error=function(c) data.frame(error=as.character(c))
+  ) %>%
+    add_column(elapsed_time=Sys.time()-start_time)
 }
 
 
+# A function that takes the url of a luftdaten archive .csv file (which will always pertain to a specific sensor) 
+# and returns the location as a lattitude and longitude in a data frame. Alternatively if there's an error, and 
+# if this function is being run a lot there may well be, the error message is returned
+
+# The data frame has the following fields (depending on if there's an error):
+# sensor_id
+# location
+# lat
+# long
+# error
+
+get_location<-function(file_url){
+  tryCatch(
+    read_delim(file_url,";",n_max=1) %>% 
+      select(sensor_id,sensor_type,location,lat,lon),
+    error=function(c) data.frame(error=as.character(c))
+  )
+}
+
+```
+
+Make a list of every sensor, sampling one day per month.
+
+```{r warning=FALSE}
+start_day=ymd("2015-10-01") #first ever day
+stop_day=ymd(today())
+time_length(interval(start_day,stop_day),"days")
+```
+
+
+```{r warning=FALSE}
+sensor_list<-tibble(day=seq(start_day,stop_day,by='quarter')) %>%
+  group_by(day) %>%
+  do(make_sensor_list(.$day))
 ```
 
 ```{r}
-start_day=ymd("2015-10-01") #first ever day
-#start_day=ymd("2019-01-01")
-#stop_day=ymd("2019-06-30")
-stop_day=ymd(today())
+sensor_summary<-sensor_list %>% 
+  group_by(date, elapsed_time) %>% 
+  summarise(total_data_mb=sum(size/(1024^2),na.rm=TRUE),n_sensors=n()) %>%
+  mutate(days_from_start=time_length(interval(start_day,date),"days")) %>%
+  filter(date!="2018-04-01") #size data is badly formatted on this day
 
-sensor_list<-tibble(day=seq(start_day,stop_day,by='month')) %>%
-  group_by(day) %>%
-  do(make_sensor_list(.$day))
+sensor_summary %>%
+  ggplot(aes(x=days_from_start,y=total_data_mb,label=date))+
+    geom_point()+
+    geom_area()
+
+AUC(sensor_summary$days_from_start,sensor_summary$total_data_mb)/1024
 
 ```
+
+
+Find the first day that each sensor id appears. We can't just make a list of unique sensor ids as we need to know a day on which the sensor is active in order to get more details from the archive via a .csv file. This may as well be the first day we see the sensor id.
 
 ```{r}
 first_day_list<-sensor_list %>%
@@ -49,24 +108,26 @@ first_day_list<-sensor_list %>%
   mutate(sensor_id=as.numeric(sensor_id))
 ```
 
-```{r message=FALSE}
-get_location<-function(file_url){
-  tryCatch(
-    read_delim(file_url,";",n_max=1) %>% 
-      select(sensor_id,sensor_type,location,lat,lon),
-    error=function(c) data.frame(error=as.character(c),fail_url=file_url)
-  )
-}
-```
-
+Caution, this takes flipping hours.
 
 ```{r message=FALSE}
 sensor_locations<-first_day_list %>%
                     group_by(file_url) %>%
                     do(get_location(.$file_url))
 
-#write_csv(sensor_locations,"sensor_locations.csv")
+sensor_locations %>% 
+  mutate(error=str_replace_all(error,"[\r\n]","")) %>%
+  write_csv("sensor_locations.csv")
 ```
+
+```{r}
+#sensor_locations<-bind_rows(
+#  get_location("http://archive.luftdaten.info/2015-12-01/2015-12-01_ppd42ns_sensor_40.csv"),
+#  get_location("http://nowt"))
+```
+
+
+
 
 ```{r}
 sensor_locations<-read_csv("sensor_locations.csv")
