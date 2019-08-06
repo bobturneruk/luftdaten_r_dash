@@ -6,6 +6,7 @@ output: html_notebook
 ```{r}
 library(tidyverse)
 library(rvest)
+library(curl)
 source("functions/get_file_list.R")
 source("functions/safe_download_file.R")
 ```
@@ -38,7 +39,7 @@ local_files<-tibble(name=list.files(local_folder_path))
 ```{r}
 download_report<-list_of_parquet_files %>%
   anti_join(local_files) %>%
-  #filter(name=="part-00000-54e040bf-d929-489f-aa97-128e727c5aa0-c000.snappy.parquet") %>%
+  filter(name=="part-00000-54e040bf-d929-489f-aa97-128e727c5aa0-c000.snappy.parquet") %>%
   group_by(name,url) %>%
   do(safe_download_file(.$url,.$name,local_folder_path))
 ```
@@ -46,12 +47,12 @@ download_report<-list_of_parquet_files %>%
 ```{r}
 library(sparklyr)
 #spark_uninstall(version="2.1.0",hadoop_version="2.7")
-spark_install(version="2.4.3")
+#spark_install(version="2.4.3")
 sc <- spark_connect(master = "local")
 ```
 
 ```{r}
-luftdaten_df<-spark_read_parquet(sc,"luftdaten","C:/luftdaten_parquet_subset",memory=FALSE)
+luftdaten_df<-spark_read_parquet(sc,"luftdaten","J:/luftdaten_parquet",memory=FALSE)
 
 ```
 
